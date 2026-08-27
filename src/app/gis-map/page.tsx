@@ -6,6 +6,7 @@ import Footer from "@/components/layout/Footer";
 import dynamic from "next/dynamic";
 import { useState, useEffect, useRef } from "react";
 import { MOCK_PARCELS } from "@/lib/data/cadastral-parcels";
+import DataStatusIndicator, { DataSource } from "@/components/ui/DataStatusIndicator";
 import { CadastralParcel } from "@/types";
 import { getStoredParcels, saveStoredParcels } from "@/lib/storage";
 import {
@@ -115,6 +116,7 @@ export default function GisMapPage() {
   const [selectedCorridor, setSelectedCorridor] = useState("DAUSA_PKG1");
   const [importNotification, setImportNotification] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [dataSource, setDataSource] = useState<DataSource | null>(null);
 
   const [activeLayers, setActiveLayers] = useState({
     rowBuffer: true,
@@ -133,6 +135,7 @@ export default function GisMapPage() {
           if (result && result.data && Array.isArray(result.data) && result.data.length > 0) {
             setParcels(result.data);
             setSelectedParcel(result.data[0] || null);
+            if (result.source) setDataSource(result.source as DataSource);
             return;
           }
         }
@@ -142,6 +145,7 @@ export default function GisMapPage() {
       const stored = getStoredParcels();
       setParcels(stored);
       setSelectedParcel(stored[0] || null);
+      setDataSource("DYNAMIC_CACHE");
     }
     loadDynamicParcels();
   }, []);
@@ -298,7 +302,7 @@ export default function GisMapPage() {
           {/* Top GIS Toolbar */}
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4">
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-xs font-mono font-bold uppercase bg-surface-container-high px-2 py-0.5 rounded text-secondary border border-outline-variant/30">
                   Spatial Cadastral Core
                 </span>
@@ -306,6 +310,7 @@ export default function GisMapPage() {
                   <span className="w-2 h-2 rounded-full bg-success-green animate-pulse" />
                   DILRMP Federated Sync: Online
                 </span>
+                <DataStatusIndicator source={dataSource || undefined} />
               </div>
               <h1 className="text-xl md:text-2xl font-bold text-on-surface font-sans">
                 Interactive Cadastral GIS & RoW Corridor

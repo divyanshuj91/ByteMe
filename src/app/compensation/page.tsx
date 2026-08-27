@@ -5,8 +5,8 @@ import Sidebar from "@/components/layout/Sidebar";
 import Footer from "@/components/layout/Footer";
 import { useState, useMemo, useEffect } from "react";
 import { computeRFCTLARRCompensation } from "@/lib/rfctlarr-engine";
-import { MOCK_BENEFICIARIES } from "@/lib/data/mock-projects";
-import { getStoredBeneficiaries, saveStoredBeneficiaries } from "@/lib/storage";
+import useSWR from "swr";
+import DataStatusIndicator, { DataSource } from "@/components/ui/DataStatusIndicator";
 import AwardDossierModal from "@/components/compensation/AwardDossierModal";
 import {
   Calculator,
@@ -65,51 +65,89 @@ export default function CompensationPage() {
     rehabGrant,
   ]);
 
-  const [beneficiaries, setBeneficiaries] = useState(MOCK_BENEFICIARIES);
+  // Fetch live parcels using SWR
+  const fetcher = (url: string) => fetch(url).then(res => res.json());
+  const { data: parcelsRes, mutate: mutateParcels } = useSWR("/api/parcels", fetcher, { refreshInterval: 15000 });
+  const parcels: any[] = parcelsRes?.data || [];
+  const currentSource = parcelsRes?.source as DataSource | null;
+
+  const beneficiaries = parcels.map((p: any) => ({
+    id: p.id,
+    name: p.ownerName,
+    khasraNo: p.khasraNo,
+    village: p.village,
+    areaHa: p.areaHa || 1.2,
+    bankAccountMasked: "**** **** 4122",
+    ifsc: "SBIN000XXXX",
+    totalAwardLakhs: p.awardedAmountLakhs || 0,
+    dbtStatus: p.compensationStatus === "DISBURSED" ? "SUCCESS" :
+               p.compensationStatus === "ESCROW_LITIGATION" ? "HOLD_DISPUTE" :
+               p.compensationStatus === "AWARD_PUBLISHED" ? "PROCESSING" : "PENDING",
+    utrNumber: p.compensationStatus === "DISBURSED" ? `PFMS${p.id.slice(0, 6)}` : null
+  }));
+
   const [dbtSuccessMsg, setDbtSuccessMsg] = useState<{ text: string; sms?: string } | null>(null);
 
-  // Initialize from storage on mount
-  useEffect(() => {
-    setBeneficiaries(getStoredBeneficiaries());
-  }, []);
+  const handleTriggerDBT = async (id: string, name: string, parcelAreaHa: number, phone: string = "+91 98290-XXXXX") => {
+    try {
+      const payload = {
+        parcelId: id,
+        baseMarketRatePerHa: Math.max(circleRate, saleDeedRate),
+        areaHa: parcelAreaHa,
+        isRural,
+        distanceFromUrbanKm: distanceKm,
+        structureValuationLakhs: structureValuation,
+        treesCropsValuationLakhs: treesValuation,
+        interestMonths,
+        rehabilitationAssistanceLakhs: rehabGrant
+      };
 
-  const handleTriggerDBT = (id: string, name: string, phone: string = "+91 98290-XXXXX") => {
-    const utr = `PFMS${Date.now().toString().slice(0, 10)}`;
-    const updated = beneficiaries.map((b) =>
-      b.id === id
-        ? {
-            ...b,
-            dbtStatus: "SUCCESS" as const,
-            disbursedLakhs: b.totalAwardLakhs,
-            utrNumber: utr,
-            disbursedDate: new Date().toISOString().split("T")[0],
-          }
-        : b
-    );
-    setBeneficiaries(updated);
-    saveStoredBeneficiaries(updated);
-    setDbtSuccessMsg({
-      text: `PFMS DBT batch dispatched! UTR: ${utr} credited to ${name}.`,
-      sms: `SMS Sent to ${phone}: "Govt of RJ: ₹${calculation.totalPayableLakhs}L credited via DBT under RFCTLARR Award for Plot 42A. Ref: ${utr}"`,
-    });
-    setTimeout(() => setDbtSuccessMsg(null), 6000);
+      const computeRes = await fetch("/api/valuation/compute", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const computeData = await computeRes.json();
+
+      if (!computeRes.ok || !computeData.success) throw new Error(computeData.error || "Compute failed");
+
+      const valuationId = computeData.data.valuationId;
+
+      const signRes = await fetch(`/api/valuation/${valuationId}/sign`, {
+        method: "POST"
+      });
+      const signData = await signRes.json();
+
+      if (!signRes.ok || !signData.success) throw new Error(signData.error || "Sign failed");
+
+      mutateParcels();
+      
+      const utr = `PFMS${Date.now().toString().slice(0, 10)}`;
+      setDbtSuccessMsg({
+        text: `PFMS DBT batch dispatched! UTR: ${utr} credited to ${name}.`,
+        sms: `SMS Sent to ${phone}: "Govt of RJ: ₹${computeData.data.breakdown.totalPayableLakhs}L credited via DBT under RFCTLARR Award. Ref: ${utr}"`,
+      });
+      setTimeout(() => setDbtSuccessMsg(null), 6000);
+    } catch (e) {
+      alert("Failed to sign and disburse: " + (e as Error).message);
+    }
   };
 
   const handleRouteToEscrow = (id: string, name: string) => {
     const escrowRef = `ESCROW-SEC64-${Date.now().toString().slice(0, 8)}`;
-    const updated = beneficiaries.map((b) =>
+    const updated = beneficiaries.map((b: any) =>
       b.id === id
         ? {
             ...b,
-            dbtStatus: "SUCCESS" as const,
+            dbtStatus: "HOLD_DISPUTE" as const,
             disbursedLakhs: b.totalAwardLakhs,
             utrNumber: escrowRef,
             disbursedDate: new Date().toISOString().split("T")[0],
           }
         : b
     );
-    setBeneficiaries(updated);
-    saveStoredBeneficiaries(updated);
+    // Locally updating array since we don't have a specific escrow API in this phase, 
+    // but a real implementation would update parcel compensationStatus to 'ESCROW_LITIGATION'.
     setDbtSuccessMsg({
       text: `Section 64 Litigation Guard: Disbursal to ${name} locked; ₹${calculation.totalPayableLakhs}L routed to District Land Tribunal Escrow (${escrowRef}).`,
     });
@@ -126,15 +164,16 @@ export default function CompensationPage() {
         <main className="flex-1 p-4 md:p-8 overflow-y-auto">
           {/* Header */}
           <div className="mb-6">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-mono font-bold uppercase bg-surface-container-high px-2 py-0.5 rounded text-primary border border-outline-variant/30">
-                RFCTLARR-2013 Valuation Engine
-              </span>
-              <span className="text-xs font-mono text-emphasis">
-                First & Second Schedule Compliance
-              </span>
-            </div>
-            <h1 className="text-2xl md:text-3xl font-bold text-on-surface mt-1 font-sans">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs font-mono font-bold uppercase bg-surface-container-high px-2 py-0.5 rounded text-primary border border-outline-variant/30">
+                  RFCTLARR-2013 Valuation Engine
+                </span>
+                <span className="text-xs font-mono text-emphasis">
+                  First & Second Schedule Compliance
+                </span>
+                <DataStatusIndicator source={currentSource || undefined} />
+              </div>
+              <h1 className="text-2xl md:text-3xl font-bold text-on-surface mt-1 font-sans">
               Statutory Compensation & R&R Disbursements
             </h1>
             <p className="text-xs text-emphasis mt-0.5">
@@ -465,7 +504,7 @@ export default function CompensationPage() {
                       <td className="py-3 text-right">
                         {b.dbtStatus !== "SUCCESS" && b.dbtStatus !== "HOLD_DISPUTE" ? (
                           <button
-                            onClick={() => handleTriggerDBT(b.id, b.name)}
+                            onClick={() => handleTriggerDBT(b.id, b.name, b.areaHa)}
                             className="bg-primary hover:bg-primary/90 text-white px-3 py-1.5 rounded text-[11px] font-bold transition-all shadow-sm"
                           >
                             Sign & Disburse

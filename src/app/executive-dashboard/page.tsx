@@ -18,8 +18,8 @@ import {
   Filter,
 } from "lucide-react";
 import { useState, useEffect } from "react";
-import { MOCK_PROJECTS } from "@/lib/data/mock-projects";
 import { AcquisitionProject } from "@/types";
+import DataStatusIndicator, { DataSource } from "@/components/ui/DataStatusIndicator";
 
 interface RedFlag {
   id: string;
@@ -35,7 +35,7 @@ interface RedFlag {
 
 export default function ExecutiveDashboardPage() {
   const [selectedState, setSelectedState] = useState("ALL");
-  const [projects, setProjects] = useState<AcquisitionProject[]>(MOCK_PROJECTS);
+  const [projects, setProjects] = useState<AcquisitionProject[]>([]);
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -116,13 +116,16 @@ export default function ExecutiveDashboardPage() {
           {/* Header */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-xs font-mono font-bold uppercase bg-surface-container-high px-2 py-0.5 rounded text-primary border border-outline-variant/30">
                   National Apex Command
                 </span>
                 <span className="text-xs font-mono text-emphasis">
                   Q3 FY 2024-25
                 </span>
+                {!loading && stats?.source && (
+                  <DataStatusIndicator source={stats.source as DataSource} />
+                )}
               </div>
               <h1 className="text-2xl md:text-3xl font-bold text-on-surface mt-1 font-sans">
                 Executive Monitoring Matrix
@@ -317,7 +320,7 @@ export default function ExecutiveDashboardPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-outline-variant/20">
-                  {MOCK_PROJECTS.map((proj) => (
+                  {projects.map((proj) => (
                     <tr key={proj.id} className="hover:bg-surface-container/40 transition-colors">
                       <td className="py-3.5 pr-3">
                         <div className="font-bold text-primary">{proj.code}</div>

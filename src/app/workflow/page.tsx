@@ -5,9 +5,9 @@ import Sidebar from "@/components/layout/Sidebar";
 import Footer from "@/components/layout/Footer";
 import Link from "next/link";
 import { useState, useEffect } from "react";
-import { MOCK_PROJECTS } from "@/lib/data/mock-projects";
+import useSWR from "swr";
 import { AcquisitionProject, Milestone } from "@/types";
-import { getStoredProjects, saveStoredProjects } from "@/lib/storage";
+import DataStatusIndicator, { DataSource } from "@/components/ui/DataStatusIndicator";
 import {
   GitFork,
   CheckCircle2,
@@ -36,7 +36,7 @@ import {
 } from "lucide-react";
 
 export default function WorkflowPage() {
-  const [projects, setProjects] = useState<AcquisitionProject[]>([]);
+
   const [selectedProjectId, setSelectedProjectId] = useState<string>("");
   const [actionSuccessMessage, setActionSuccessMessage] = useState<string | null>(null);
   
@@ -50,93 +50,56 @@ export default function WorkflowPage() {
     section: string;
   } | null>(null);
 
+  // SWR fetcher
+  const fetcher = (url: string) => fetch(url).then((res) => res.json());
+
+  // Fetch live acquisitions
+  const { data: acqRes } = useSWR("/api/acquisitions", fetcher, { refreshInterval: 15000 });
+  const projects: AcquisitionProject[] = acqRes?.data || [];
+  
   useEffect(() => {
-    const stored = getStoredProjects();
-    setProjects(stored);
-    if (stored.length > 0) {
-      setSelectedProjectId(stored[0].id);
+    if (projects.length > 0 && !selectedProjectId) {
+      setSelectedProjectId(projects[0].id);
     }
-  }, []);
+  }, [projects, selectedProjectId]);
 
-  const selectedProject = projects.find((p) => p.id === selectedProjectId) || projects[0] || MOCK_PROJECTS[0];
+  // Fetch live workflow for selected project
+  const { data: workflowRes, mutate: mutateWorkflow } = useSWR(
+    selectedProjectId ? `/api/projects/${selectedProjectId}/workflow` : null,
+    fetcher,
+    { refreshInterval: 15000 }
+  );
 
-  const handleAdvanceStage = () => {
+  const selectedProject = projects.find((p) => p.id === selectedProjectId) || projects[0];
+  const activeMilestones = workflowRes?.data?.milestones || selectedProject?.milestones || [];
+  const currentSource = (workflowRes?.source || acqRes?.source || null) as DataSource | null;
+
+  const handleAdvanceStage = async () => {
     if (!selectedProject) return;
 
-    const milestones = selectedProject.milestones || [];
-    let updatedMilestones = [...milestones];
-    let milestoneAdvanced = false;
-    let advancedStageName = "";
-
-    // Find the first milestone that is IN_PROGRESS or PENDING
-    for (let i = 0; i < updatedMilestones.length; i++) {
-      if (updatedMilestones[i].status === "IN_PROGRESS") {
-        advancedStageName = updatedMilestones[i].name;
-        updatedMilestones[i] = {
-          ...updatedMilestones[i],
-          status: "COMPLETED",
-          completedDate: new Date().toISOString().split("T")[0],
-        };
-        if (i + 1 < updatedMilestones.length) {
-          updatedMilestones[i + 1] = {
-            ...updatedMilestones[i + 1],
-            status: "IN_PROGRESS",
-          };
-        }
-        milestoneAdvanced = true;
-        break;
-      }
-    }
-
-    if (!milestoneAdvanced) {
-      for (let i = 0; i < updatedMilestones.length; i++) {
-        if (updatedMilestones[i].status === "PENDING") {
-          advancedStageName = updatedMilestones[i].name;
-          updatedMilestones[i] = {
-            ...updatedMilestones[i],
-            status: "COMPLETED",
-            completedDate: new Date().toISOString().split("T")[0],
-          };
-          if (i + 1 < updatedMilestones.length) {
-            updatedMilestones[i + 1] = {
-              ...updatedMilestones[i + 1],
-              status: "IN_PROGRESS",
-            };
-          }
-          break;
-        }
-      }
-    }
-
-    const completedCount = updatedMilestones.filter((m) => m.status === "COMPLETED").length;
-    const progress = Math.min(100, Math.round((completedCount / updatedMilestones.length) * 100));
-
-    const updatedProjects = projects.map((p) =>
-      p.id === selectedProject.id
-        ? {
-            ...p,
-            stageProgress: progress,
-            milestones: updatedMilestones,
-          }
-        : p
-    );
-
-    setProjects(updatedProjects);
-    saveStoredProjects(updatedProjects);
-
     setIsSigning(true);
-    setTimeout(() => {
+    try {
+      const res = await fetch(`/api/projects/${selectedProject.id}/workflow/advance`, { method: "POST" });
+      const result = await res.json();
+      
+      if (res.ok) {
+        setIsDscModalOpen(false);
+        setDscPin("");
+        mutateWorkflow(); // Refresh workflow data
+        
+        const dscHash = `SHA256:${Math.random().toString(16).substring(2, 10).toUpperCase()}`;
+        setActionSuccessMessage(
+          `Stage formally signed & gazetted with Class 3 DSC Token (${dscHash})! Acquisition progress updated.`
+        );
+        setTimeout(() => setActionSuccessMessage(null), 6000);
+      } else {
+        alert(result.error || "Failed to advance workflow. Ensure prerequisite guards are met.");
+      }
+    } catch (err) {
+      alert("Network error while advancing workflow.");
+    } finally {
       setIsSigning(false);
-      setIsDscModalOpen(false);
-      setDscPin("");
-      const dscHash = `SHA256:${Math.random().toString(16).substring(2, 10).toUpperCase()}`;
-      setActionSuccessMessage(
-        `Stage "${advancedStageName}" formally signed & gazetted with Class 3 DSC Token (${dscHash})! Acquisition progress updated to ${progress}%.`
-      );
-      setTimeout(() => {
-        setActionSuccessMessage(null);
-      }, 6000);
-    }, 900);
+    }
   };
 
   return (
@@ -150,13 +113,14 @@ export default function WorkflowPage() {
           {/* Header & Case Dossier Switcher */}
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6">
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-xs font-mono font-bold uppercase bg-primary/10 text-primary px-2.5 py-0.5 rounded-full border border-primary/20">
                   RFCTLARR Statutory Pipeline
                 </span>
                 <span className="text-xs font-mono text-emphasis">
                   Tamper-Evident Workflow Engine
                 </span>
+                <DataStatusIndicator source={currentSource || undefined} />
               </div>
               <h1 className="text-2xl md:text-3xl font-bold text-on-surface mt-1.5 font-sans">
                 Stage-Gated Acquisition Dossier
@@ -324,8 +288,8 @@ export default function WorkflowPage() {
 
             {/* Visual Stepper List */}
             <div className="space-y-4">
-              {selectedProject.milestones && selectedProject.milestones.length > 0 ? (
-                selectedProject.milestones.map((m, idx) => {
+              {activeMilestones && activeMilestones.length > 0 ? (
+                activeMilestones.map((m: any, idx: number) => {
                   const isCompleted = m.status === "COMPLETED";
                   const isInProgress = m.status === "IN_PROGRESS";
 
@@ -401,7 +365,7 @@ export default function WorkflowPage() {
                           {/* Interactive File Pills */}
                           {m.documents && m.documents.length > 0 && (
                             <div className="flex flex-wrap items-center gap-1.5 mt-1">
-                              {m.documents.map((doc, docIdx) => (
+                              {m.documents.map((doc: any, docIdx: number) => (
                                 <button
                                   key={docIdx}
                                   type="button"

@@ -5,8 +5,10 @@ import Sidebar from "@/components/layout/Sidebar";
 import Footer from "@/components/layout/Footer";
 import Link from "next/link";
 import { useState, useEffect } from "react";
-import { getStoredProjects } from "@/lib/storage";
 import { AcquisitionProject } from "@/types";
+import DataStatusIndicator, { DataSource } from "@/components/ui/DataStatusIndicator";
+import { getStoredProjects } from "@/lib/storage";
+
 import {
   Briefcase,
   CheckCircle2,
@@ -31,6 +33,7 @@ export default function OperationsDashboardPage() {
   const [projects, setProjects] = useState<AcquisitionProject[]>([]);
   const [selectedQueueFilter, setSelectedQueueFilter] = useState("ALL");
   const [approvedActionMsg, setApprovedActionMsg] = useState<string | null>(null);
+  const [dataSource, setDataSource] = useState<DataSource | null>(null);
 
   useEffect(() => {
     async function fetchLiveProjects() {
@@ -40,6 +43,7 @@ export default function OperationsDashboardPage() {
           const result = await res.json();
           if (result && result.data && Array.isArray(result.data)) {
             setProjects(result.data);
+            if (result.source) setDataSource(result.source as DataSource);
             return;
           }
         }
@@ -47,6 +51,7 @@ export default function OperationsDashboardPage() {
         console.warn("Live projects fetch fallback:", err);
       }
       setProjects(getStoredProjects());
+      setDataSource("DYNAMIC_CACHE");
     }
     fetchLiveProjects();
   }, []);
@@ -107,13 +112,14 @@ export default function OperationsDashboardPage() {
           {/* Header */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-xs font-mono font-bold uppercase bg-surface-container-high px-2 py-0.5 rounded text-secondary border border-outline-variant/30">
                   District Operations Hub
                 </span>
                 <span className="text-xs font-mono text-emphasis">
                   Dausa & Sawai Madhopur Circles
                 </span>
+                <DataStatusIndicator source={dataSource || undefined} />
               </div>
               <h1 className="text-2xl md:text-3xl font-bold text-on-surface mt-1 font-sans">
                 Operations & Approvals Dashboard
