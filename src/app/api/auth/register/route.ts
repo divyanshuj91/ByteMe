@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { signSession, UserSession } from "@/lib/security/token";
 import { appendAuditRecord } from "@/lib/security/audit";
-import { REGISTERED_USERS_STORE } from "@/lib/auth-store";
+import { fetchBackend } from "@/lib/backend-api";
 
 export const dynamic = "force-dynamic";
 
@@ -26,36 +26,53 @@ export async function POST(request: Request) {
 
     const cleanEmail = email.trim().toLowerCase();
 
-    // Check if user exists
-    if (REGISTERED_USERS_STORE.has(cleanEmail)) {
-      return NextResponse.json(
-        { error: "An account with this email address already exists. Please Sign In." },
-        { status: 409 }
-      );
-    }
-
     const isCitizen = role === "CITIZEN";
     const userRole = isCitizen ? "CITIZEN" : role;
     const department = agency || (isCitizen ? "Landowner" : "Revenue & Land Reforms Department");
+
+    // Proxy the registration request to the backend
+    let backendToken: string | undefined = undefined;
+    let userId = `USER-${Date.now().toString().slice(-6)}`;
+
+    try {
+      const backendRes = await fetchBackend("/api/auth/register", {
+        method: "POST",
+        body: JSON.stringify({
+          name: name.trim(),
+          email: cleanEmail,
+          password,
+          role: userRole,
+          agency: department,
+        }),
+      });
+
+      if (backendRes && backendRes.ok) {
+        const backendData = await backendRes.json();
+        if (backendData && backendData.user) {
+          userId = backendData.user.id || userId;
+        }
+        if (backendData && backendData.token) {
+          backendToken = backendData.token;
+        }
+      } else if (backendRes && !backendRes.ok) {
+        const errorData = await backendRes.json().catch(() => ({}));
+        return NextResponse.json(
+          { error: errorData.message || "Registration failed on backend." },
+          { status: backendRes.status }
+        );
+      }
+    } catch (err) {
+      console.warn("Backend auth query failed:", err);
+      return NextResponse.json(
+        { error: "Backend service unavailable." },
+        { status: 503 }
+      );
+    }
+    
+    // TODO: email verification (post-SIH)
+
     const state = "Rajasthan";
-
-    // Save to in-memory store
-    REGISTERED_USERS_STORE.set(cleanEmail, {
-      name: name.trim(),
-      email: cleanEmail,
-      passwordHash: password, // For simulation
-      role: userRole,
-      phone: phone || "9829012345",
-      agency: department,
-      department,
-      state,
-      khasraNo: isCitizen ? "Plot 42A" : undefined,
-      village: isCitizen ? "Ramgarh Revenue Ward 3" : undefined,
-      district: isCitizen ? "Dausa" : undefined,
-    });
-
     const exp = Date.now() + 8 * 60 * 60 * 1000;
-    const userId = `USER-${Date.now().toString().slice(-6)}`;
 
     const sessionPayload: UserSession = {
       userId,
@@ -70,6 +87,7 @@ export async function POST(request: Request) {
       village: isCitizen ? "Ramgarh Revenue Ward 3" : undefined,
       district: isCitizen ? "Dausa" : undefined,
       aadhaarLast4: isCitizen ? "4291" : undefined,
+      backendToken,
       exp,
     };
 

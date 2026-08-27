@@ -2,19 +2,31 @@ import { NextResponse } from "next/server";
 import { MOCK_PROJECTS } from "@/lib/data/mock-projects";
 import { AcquisitionProject } from "@/types";
 import { fetchBackend } from "@/lib/backend-api";
+import { cookies } from "next/headers";
+import { verifySession } from "@/lib/security/token";
 
 export const dynamic = "force-dynamic";
 
 let inMemoryProjects: AcquisitionProject[] = [...MOCK_PROJECTS];
 
 export async function GET(request: Request) {
+  let authHeaders = {};
+  const cookieStore = await cookies();
+  const sessionToken = cookieStore.get("nlams_session")?.value;
+  if (sessionToken) {
+    const session = await verifySession(sessionToken);
+    if (session?.backendToken) {
+      authHeaders = { Authorization: `Bearer ${session.backendToken}` };
+    }
+  }
+
   const { searchParams } = new URL(request.url);
   const status = searchParams.get("status");
   const stage = searchParams.get("stage");
 
   // Attempt live query to Backend Database API
   try {
-    const backendRes = await fetchBackend("/api/projects");
+    const backendRes = await fetchBackend("/api/projects", { headers: authHeaders });
     if (backendRes && backendRes.ok) {
       const result = await backendRes.json();
       if (result && (result.data || Array.isArray(result))) {
@@ -53,6 +65,16 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  let authHeaders = {};
+  const cookieStore = await cookies();
+  const sessionToken = cookieStore.get("nlams_session")?.value;
+  if (sessionToken) {
+    const session = await verifySession(sessionToken);
+    if (session?.backendToken) {
+      authHeaders = { Authorization: `Bearer ${session.backendToken}` };
+    }
+  }
+
   try {
     const body = await request.json();
 
@@ -60,6 +82,7 @@ export async function POST(request: Request) {
     try {
       const backendRes = await fetchBackend("/api/projects", {
         method: "POST",
+        headers: authHeaders,
         body: JSON.stringify(body),
       });
       if (backendRes && backendRes.ok) {

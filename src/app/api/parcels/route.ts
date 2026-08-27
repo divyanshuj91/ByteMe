@@ -1,10 +1,22 @@
 import { NextResponse } from "next/server";
 import { MOCK_PARCELS } from "@/lib/data/cadastral-parcels";
 import { fetchBackend } from "@/lib/backend-api";
+import { cookies } from "next/headers";
+import { verifySession } from "@/lib/security/token";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
+  let authHeaders = {};
+  const cookieStore = await cookies();
+  const sessionToken = cookieStore.get("nlams_session")?.value;
+  if (sessionToken) {
+    const session = await verifySession(sessionToken);
+    if (session?.backendToken) {
+      authHeaders = { Authorization: `Bearer ${session.backendToken}` };
+    }
+  }
+
   const { searchParams } = new URL(request.url);
   const q = searchParams.get("q")?.toLowerCase();
   const village = searchParams.get("village");
@@ -12,7 +24,7 @@ export async function GET(request: Request) {
 
   // Attempt live query to Backend Database API
   try {
-    const backendRes = await fetchBackend("/api/gis/parcels");
+    const backendRes = await fetchBackend("/api/gis/parcels", { headers: authHeaders });
     if (backendRes && backendRes.ok) {
       const result = await backendRes.json();
       const liveParcels = result.data || result;

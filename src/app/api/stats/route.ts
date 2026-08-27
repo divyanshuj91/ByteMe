@@ -1,13 +1,25 @@
 import { NextResponse } from "next/server";
 import { MOCK_PROJECTS } from "@/lib/data/mock-projects";
 import { fetchBackend } from "@/lib/backend-api";
+import { cookies } from "next/headers";
+import { verifySession } from "@/lib/security/token";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
+  let authHeaders = {};
+  const cookieStore = await cookies();
+  const sessionToken = cookieStore.get("nlams_session")?.value;
+  if (sessionToken) {
+    const session = await verifySession(sessionToken);
+    if (session?.backendToken) {
+      authHeaders = { Authorization: `Bearer ${session.backendToken}` };
+    }
+  }
+
   // Attempt live query to Backend Database API
   try {
-    const backendRes = await fetchBackend("/api/dashboard/summary");
+    const backendRes = await fetchBackend("/api/dashboard/summary", { headers: authHeaders });
     if (backendRes && backendRes.ok) {
       const liveData = await backendRes.json();
       if (liveData) {
