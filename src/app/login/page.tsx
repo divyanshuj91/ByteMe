@@ -11,6 +11,7 @@ import {
   ArrowRight,
   CheckCircle,
   AlertCircle,
+  Lock,
   BadgeCheck,
   Smartphone,
   CreditCard,
