@@ -11,13 +11,9 @@ import {
   ArrowRight,
   CheckCircle,
   AlertCircle,
-  Building,
-  Lock,
   BadgeCheck,
-  Sparkles,
   Smartphone,
   CreditCard,
-  Send,
   RefreshCw,
   Landmark,
   UserCheck,
@@ -53,6 +49,9 @@ function LoginForm() {
   const [dscSuccess, setDscSuccess] = useState(false);
 
   // Citizen Form States
+  const [citizenLoginMethod, setCitizenLoginMethod] = useState<"AADHAAR" | "EMAIL">("EMAIL");
+  const [citizenEmail, setCitizenEmail] = useState("");
+  const [citizenPassword, setCitizenPassword] = useState("");
   const [aadhaarOrPhone, setAadhaarOrPhone] = useState("");
   const [otpStep, setOtpStep] = useState<"INPUT" | "OTP_SENT">("INPUT");
   const [otpValue, setOtpValue] = useState("");
@@ -109,7 +108,35 @@ function LoginForm() {
     }
   };
 
-  // 2. Citizen Verify & Login
+  // 2a. Citizen Email+Password Login
+  const handleCitizenEmailLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setErrorMsg(null);
+
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: citizenEmail.trim().toLowerCase(), password: citizenPassword }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setErrorMsg(data.error || "Invalid email or password.");
+        setLoading(false);
+        return;
+      }
+
+      const target = redirectTarget || "/citizen-portal";
+      router.push(target);
+    } catch {
+      setErrorMsg("Network error connecting to authentication service.");
+      setLoading(false);
+    }
+  };
+
+  // 2b. Citizen Verify OTP & Login
   const handleCitizenLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -533,95 +560,200 @@ function LoginForm() {
         {/* ===================== CITIZEN LOGIN VIEW ===================== */}
         {authType === "SIGN_IN" && authMode === "CITIZEN" && (
           <div>
+            {/* Citizen Login Method Toggle */}
+            <div className="grid grid-cols-2 gap-2 p-1 bg-surface-container rounded-2xl mb-4 text-xs font-bold border border-outline-variant/40 shadow-sm">
+              <button
+                type="button"
+                onClick={() => {
+                  setCitizenLoginMethod("EMAIL");
+                  setErrorMsg(null);
+                  setSuccessMsg(null);
+                }}
+                className={`py-2 px-3 rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                  citizenLoginMethod === "EMAIL"
+                    ? "bg-emerald-700 text-white shadow-md font-semibold"
+                    : "text-emphasis hover:text-on-surface"
+                }`}
+              >
+                <Mail className="w-4 h-4" />
+                <span>Login with Email</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setCitizenLoginMethod("AADHAAR");
+                  setErrorMsg(null);
+                  setSuccessMsg(null);
+                }}
+                className={`py-2 px-3 rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                  citizenLoginMethod === "AADHAAR"
+                    ? "bg-emerald-700 text-white shadow-md font-semibold"
+                    : "text-emphasis hover:text-on-surface"
+                }`}
+              >
+                <CreditCard className="w-4 h-4" />
+                <span>Aadhaar OTP</span>
+              </button>
+            </div>
+
             {/* Clean Citizen Login Box */}
             <div className="glass-card rounded-2xl p-6 md:p-8 shadow-xl border border-outline-variant/40">
-              <form onSubmit={handleCitizenLogin} className="space-y-4">
-                {/* Aadhaar or Mobile input */}
-                <div>
-                  <label className="block text-xs uppercase text-emphasis mb-1 font-bold">
-                    Aadhaar Number / Registered Mobile
-                  </label>
-                  <div className="relative">
-                    <CreditCard className="w-4 h-4 text-emphasis absolute left-3 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="text"
-                      required
-                      value={aadhaarOrPhone}
-                      onChange={(e) => setAadhaarOrPhone(e.target.value)}
-                      className="solarized-input w-full pl-9 pr-3 py-2.5 rounded-xl text-xs font-mono font-bold"
-                      placeholder="12-digit Aadhaar / 10-digit Mobile"
-                    />
-                  </div>
-                </div>
 
-                {/* OTP Section */}
-                {otpStep === "INPUT" ? (
+              {/* ===== EMAIL + PASSWORD LOGIN ===== */}
+              {citizenLoginMethod === "EMAIL" && (
+                <form onSubmit={handleCitizenEmailLogin} className="space-y-4">
+                  <div>
+                    <label className="block text-xs uppercase text-emphasis mb-1 font-bold">
+                      Email Address
+                    </label>
+                    <div className="relative">
+                      <Mail className="w-4 h-4 text-emphasis absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="email"
+                        required
+                        value={citizenEmail}
+                        onChange={(e) => setCitizenEmail(e.target.value)}
+                        className="solarized-input w-full pl-9 pr-3 py-2.5 rounded-xl text-xs font-mono font-bold"
+                        placeholder="name@example.com"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs uppercase text-emphasis mb-1 font-bold">
+                      Password
+                    </label>
+                    <div className="relative">
+                      <KeyRound className="w-4 h-4 text-emphasis absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="password"
+                        required
+                        value={citizenPassword}
+                        onChange={(e) => setCitizenPassword(e.target.value)}
+                        className="solarized-input w-full pl-9 pr-3 py-2.5 rounded-xl text-xs font-mono font-bold"
+                        placeholder="••••••••"
+                      />
+                    </div>
+                  </div>
+
                   <button
-                    type="button"
-                    onClick={handleSendOtp}
-                    disabled={otpSending}
+                    type="submit"
+                    disabled={loading}
                     className="w-full bg-emerald-700 hover:bg-emerald-800 text-white font-sans font-bold text-xs uppercase tracking-wider py-3 rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
                   >
-                    {otpSending ? (
+                    {loading ? (
                       <RefreshCw className="w-4 h-4 animate-spin" />
                     ) : (
-                      <Smartphone className="w-4 h-4" />
+                      <LogIn className="w-4 h-4" />
                     )}
-                    <span>{otpSending ? "Dispatching UIDAI OTP..." : "Send Aadhaar OTP"}</span>
+                    <span>{loading ? "Authenticating..." : "Sign In to Citizen Portal"}</span>
                   </button>
-                ) : (
-                  <div className="space-y-3">
-                    <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <label className="text-xs uppercase text-emphasis font-bold">
-                          Enter 6-Digit OTP
-                        </label>
-                      </div>
-                      <div className="relative">
-                        <KeyRound className="w-4 h-4 text-emphasis absolute left-3 top-1/2 -translate-y-1/2" />
-                        <input
-                          type="text"
-                          maxLength={6}
-                          required
-                          value={otpValue}
-                          onChange={(e) => setOtpValue(e.target.value)}
-                          className="solarized-input w-full pl-9 pr-3 py-2.5 rounded-xl text-sm font-mono font-bold tracking-widest text-center"
-                          placeholder="••••••"
-                        />
-                      </div>
-                    </div>
 
-                    <div className="flex items-center justify-between text-[11px] text-emphasis">
-                      <span>Didn&apos;t receive code?</span>
-                      <button
-                        type="button"
-                        onClick={handleSendOtp}
-                        disabled={otpCountdown > 0 || otpSending}
-                        className="text-primary font-bold hover:underline disabled:opacity-50"
-                      >
-                        {otpCountdown > 0
-                          ? `Resend in ${otpCountdown}s`
-                          : "Resend UIDAI OTP"}
-                      </button>
-                    </div>
-
+                  <div className="text-center pt-1">
                     <button
-                      type="submit"
-                      disabled={loading || !otpValue}
-                      className="w-full bg-emerald-700 hover:bg-emerald-800 text-white font-sans font-bold text-xs uppercase tracking-wider py-3 rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+                      type="button"
+                      onClick={() => {
+                        setAuthType("SIGN_UP");
+                        setErrorMsg(null);
+                      }}
+                      className="text-xs text-primary font-bold hover:underline cursor-pointer"
                     >
-                      {loading ? (
-                        <span>Verifying Cryptographic UIDAI Session...</span>
-                      ) : (
-                        <>
-                          <span>Verify & Enter Citizen Dashboard</span>
-                          <ArrowRight className="w-4 h-4" />
-                        </>
-                      )}
+                      Don&apos;t have an account? Register here →
                     </button>
                   </div>
-                )}
-              </form>
+                </form>
+              )}
+
+              {/* ===== AADHAAR OTP LOGIN ===== */}
+              {citizenLoginMethod === "AADHAAR" && (
+                <form onSubmit={handleCitizenLogin} className="space-y-4">
+                  {/* Aadhaar or Mobile input */}
+                  <div>
+                    <label className="block text-xs uppercase text-emphasis mb-1 font-bold">
+                      Aadhaar Number / Registered Mobile
+                    </label>
+                    <div className="relative">
+                      <CreditCard className="w-4 h-4 text-emphasis absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        required
+                        value={aadhaarOrPhone}
+                        onChange={(e) => setAadhaarOrPhone(e.target.value)}
+                        className="solarized-input w-full pl-9 pr-3 py-2.5 rounded-xl text-xs font-mono font-bold"
+                        placeholder="12-digit Aadhaar / 10-digit Mobile"
+                      />
+                    </div>
+                  </div>
+
+                  {/* OTP Section */}
+                  {otpStep === "INPUT" ? (
+                    <button
+                      type="button"
+                      onClick={handleSendOtp}
+                      disabled={otpSending}
+                      className="w-full bg-emerald-700 hover:bg-emerald-800 text-white font-sans font-bold text-xs uppercase tracking-wider py-3 rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      {otpSending ? (
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Smartphone className="w-4 h-4" />
+                      )}
+                      <span>{otpSending ? "Dispatching UIDAI OTP..." : "Send Aadhaar OTP"}</span>
+                    </button>
+                  ) : (
+                    <div className="space-y-3">
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="text-xs uppercase text-emphasis font-bold">
+                            Enter 6-Digit OTP
+                          </label>
+                        </div>
+                        <div className="relative">
+                          <KeyRound className="w-4 h-4 text-emphasis absolute left-3 top-1/2 -translate-y-1/2" />
+                          <input
+                            type="text"
+                            maxLength={6}
+                            required
+                            value={otpValue}
+                            onChange={(e) => setOtpValue(e.target.value)}
+                            className="solarized-input w-full pl-9 pr-3 py-2.5 rounded-xl text-sm font-mono font-bold tracking-widest text-center"
+                            placeholder="••••••"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between text-[11px] text-emphasis">
+                        <span>Didn&apos;t receive code?</span>
+                        <button
+                          type="button"
+                          onClick={handleSendOtp}
+                          disabled={otpCountdown > 0 || otpSending}
+                          className="text-primary font-bold hover:underline disabled:opacity-50"
+                        >
+                          {otpCountdown > 0
+                            ? `Resend in ${otpCountdown}s`
+                            : "Resend UIDAI OTP"}
+                        </button>
+                      </div>
+
+                      <button
+                        type="submit"
+                        disabled={loading || !otpValue}
+                        className="w-full bg-emerald-700 hover:bg-emerald-800 text-white font-sans font-bold text-xs uppercase tracking-wider py-3 rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+                      >
+                        {loading ? (
+                          <span>Verifying Cryptographic UIDAI Session...</span>
+                        ) : (
+                          <>
+                            <span>Verify & Enter Citizen Dashboard</span>
+                            <ArrowRight className="w-4 h-4" />
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  )}
+                </form>
+              )}
             </div>
           </div>
         )}

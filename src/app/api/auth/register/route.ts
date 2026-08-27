@@ -48,16 +48,19 @@ export async function POST(request: Request) {
 
       if (backendRes && backendRes.ok) {
         const backendData = await backendRes.json();
-        if (backendData && backendData.user) {
-          userId = backendData.user.id || userId;
+        const payload = backendData.data || backendData;
+        const user = payload.user || backendData.user;
+        const token = payload.token || backendData.token;
+        if (user) {
+          userId = user.id || userId;
         }
-        if (backendData && backendData.token) {
-          backendToken = backendData.token;
+        if (token) {
+          backendToken = token;
         }
       } else if (backendRes && !backendRes.ok) {
         const errorData = await backendRes.json().catch(() => ({}));
         return NextResponse.json(
-          { error: errorData.message || "Registration failed on backend." },
+          { error: errorData.error || errorData.message || "Registration failed on backend." },
           { status: backendRes.status }
         );
       }

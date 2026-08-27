@@ -29,22 +29,25 @@ export async function POST(request: Request) {
 
       if (backendRes && backendRes.ok) {
         const backendData = await backendRes.json();
-        if (backendData && backendData.user && backendData.token) {
+        const payload = backendData.data || backendData;
+        const user = payload.user || backendData.user;
+        const token = payload.token || backendData.token;
+        if (user && token) {
           sessionPayload = {
-            userId: backendData.user.id || `USER-${cleanEmail.slice(0, 4).toUpperCase()}`,
-            name: backendData.user.name,
-            email: backendData.user.email,
-            role: backendData.user.role,
-            userType: backendData.user.role === "CITIZEN" ? "CITIZEN" : "OFFICER",
-            department: backendData.user.agency,
-            backendToken: backendData.token,
+            userId: user.id || `USER-${cleanEmail.slice(0, 4).toUpperCase()}`,
+            name: user.name,
+            email: user.email,
+            role: user.role,
+            userType: user.role === "CITIZEN" ? "CITIZEN" : "OFFICER",
+            department: user.agency,
+            backendToken: token,
             exp: Date.now() + 8 * 60 * 60 * 1000,
           };
         }
       } else if (backendRes && !backendRes.ok) {
         const errorData = await backendRes.json().catch(() => ({}));
         return NextResponse.json(
-          { error: errorData.message || "Invalid credentials." },
+          { error: errorData.error || errorData.message || "Invalid credentials." },
           { status: backendRes.status }
         );
       }
