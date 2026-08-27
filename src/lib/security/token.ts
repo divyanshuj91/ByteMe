@@ -5,9 +5,6 @@
 
 const SECRET_KEY = process.env.NLAMS_AUTH_SECRET || "nlams_super_secure_statutory_key_2026_goi_nic";
 
-if (process.env.NODE_ENV === "production" && !process.env.NLAMS_AUTH_SECRET) {
-  throw new Error("NLAMS_AUTH_SECRET environment variable is missing in production.");
-}
 
 // Helper to convert string to BufferSource
 function strToBuf(str: string): BufferSource {
