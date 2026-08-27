@@ -102,6 +102,20 @@ export default function WorkflowPage() {
     }
   };
 
+  if (!selectedProject) {
+    return (
+      <div className="min-h-screen flex flex-col bg-background text-on-background">
+        <Navbar />
+        <div className="flex-1 flex w-full max-w-[1440px] mx-auto">
+          <Sidebar />
+          <main className="flex-1 p-4 md:p-8 flex items-center justify-center">
+            <p className="text-emphasis font-mono animate-pulse">Loading workflow engine...</p>
+          </main>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex flex-col bg-background text-on-background">
       <Navbar />
