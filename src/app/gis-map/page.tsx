@@ -123,11 +123,27 @@ export default function GisMapPage() {
     forestZones: false,
   });
 
-  // Initialize from storage or default
+  // Initialize from live API or storage
   useEffect(() => {
-    const stored = getStoredParcels();
-    setParcels(stored);
-    setSelectedParcel(stored[0] || null);
+    async function loadDynamicParcels() {
+      try {
+        const res = await fetch("/api/parcels");
+        if (res.ok) {
+          const result = await res.json();
+          if (result && result.data && Array.isArray(result.data) && result.data.length > 0) {
+            setParcels(result.data);
+            setSelectedParcel(result.data[0] || null);
+            return;
+          }
+        }
+      } catch (err) {
+        console.warn("Live GIS parcels fetch fallback:", err);
+      }
+      const stored = getStoredParcels();
+      setParcels(stored);
+      setSelectedParcel(stored[0] || null);
+    }
+    loadDynamicParcels();
   }, []);
 
   const handleCorridorChange = (corridorKey: string) => {

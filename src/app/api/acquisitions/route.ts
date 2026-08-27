@@ -1,15 +1,42 @@
 import { NextResponse } from "next/server";
 import { MOCK_PROJECTS } from "@/lib/data/mock-projects";
 import { AcquisitionProject } from "@/types";
+import { fetchBackend } from "@/lib/backend-api";
 
-let projects: AcquisitionProject[] = [...MOCK_PROJECTS];
+export const dynamic = "force-dynamic";
+
+let inMemoryProjects: AcquisitionProject[] = [...MOCK_PROJECTS];
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const status = searchParams.get("status");
   const stage = searchParams.get("stage");
 
-  let filtered = projects;
+  // Attempt live query to Backend Database API
+  try {
+    const backendRes = await fetchBackend("/api/projects");
+    if (backendRes && backendRes.ok) {
+      const result = await backendRes.json();
+      if (result && (result.data || Array.isArray(result))) {
+        const liveProjects = result.data || result;
+        if (Array.isArray(liveProjects) && liveProjects.length > 0) {
+          let filtered = liveProjects;
+          if (status) filtered = filtered.filter((p: any) => p.status === status);
+          if (stage) filtered = filtered.filter((p: any) => p.currentStage === stage);
+          return NextResponse.json({
+            success: true,
+            total: filtered.length,
+            data: filtered,
+            source: "LIVE_DATABASE",
+          });
+        }
+      }
+    }
+  } catch (err) {
+    console.warn("Live backend query fallback:", err);
+  }
+
+  let filtered = inMemoryProjects;
   if (status) {
     filtered = filtered.filter((p) => p.status === status);
   }
@@ -21,12 +48,33 @@ export async function GET(request: Request) {
     success: true,
     total: filtered.length,
     data: filtered,
+    source: "DYNAMIC_CACHE",
   });
 }
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
+
+    // Forward to live backend
+    try {
+      const backendRes = await fetchBackend("/api/projects", {
+        method: "POST",
+        body: JSON.stringify(body),
+      });
+      if (backendRes && backendRes.ok) {
+        const liveResult = await backendRes.json();
+        return NextResponse.json({
+          success: true,
+          message: "Acquisition project created in live database",
+          data: liveResult.data || liveResult,
+          source: "LIVE_DATABASE",
+        });
+      }
+    } catch (err) {
+      console.warn("Backend project creation fallback:", err);
+    }
+
     const newProject: AcquisitionProject = {
       id: `proj-${Date.now()}`,
       code: body.code || `ACQ-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
@@ -67,14 +115,15 @@ export async function POST(request: Request) {
       ],
     };
 
-    projects.unshift(newProject);
+    inMemoryProjects.unshift(newProject);
 
     return NextResponse.json({
       success: true,
       message: "Acquisition project initiated successfully",
       data: newProject,
+      source: "DYNAMIC_CACHE",
     });
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { success: false, message: "Invalid payload" },
       { status: 400 }

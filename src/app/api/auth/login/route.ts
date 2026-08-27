@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { signSession, OfficerSession, UserSession } from "@/lib/security/token";
 import { appendAuditRecord } from "@/lib/security/audit";
 import { REGISTERED_USERS_STORE } from "@/lib/auth-store";
+import { fetchBackend } from "@/lib/backend-api";
 
 export const dynamic = "force-dynamic";
 
@@ -83,7 +84,7 @@ export async function POST(request: Request) {
     const match = VERIFIED_OFFICERS[cleanEmail];
     const registered = REGISTERED_USERS_STORE.get(cleanEmail);
 
-    let sessionPayload: UserSession;
+    let sessionPayload: UserSession | null = null;
 
     if (match && (dscChallenge || match.pass === password)) {
       sessionPayload = {
@@ -106,6 +107,32 @@ export async function POST(request: Request) {
         exp: Date.now() + 8 * 60 * 60 * 1000,
       };
     } else {
+      // Attempt authentication via Backend Database API
+      try {
+        const backendRes = await fetchBackend("/api/auth/login", {
+          method: "POST",
+          body: JSON.stringify({ email: cleanEmail, password }),
+        });
+        if (backendRes && backendRes.ok) {
+          const backendData = await backendRes.json();
+          if (backendData && backendData.user) {
+            sessionPayload = {
+              userId: backendData.user.id || `USER-${cleanEmail.slice(0, 4).toUpperCase()}`,
+              name: backendData.user.name,
+              email: backendData.user.email,
+              role: backendData.user.role,
+              userType: backendData.user.role === "CITIZEN" ? "CITIZEN" : "OFFICER",
+              department: backendData.user.agency,
+              exp: Date.now() + 8 * 60 * 60 * 1000,
+            };
+          }
+        }
+      } catch (err) {
+        console.warn("Backend auth query fallback:", err);
+      }
+    }
+
+    if (!sessionPayload) {
       return NextResponse.json(
         { error: "Invalid credentials. Please check your email and password." },
         { status: 401 }

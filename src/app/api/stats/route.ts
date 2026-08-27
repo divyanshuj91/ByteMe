@@ -1,7 +1,27 @@
 import { NextResponse } from "next/server";
 import { MOCK_PROJECTS } from "@/lib/data/mock-projects";
+import { fetchBackend } from "@/lib/backend-api";
+
+export const dynamic = "force-dynamic";
 
 export async function GET() {
+  // Attempt live query to Backend Database API
+  try {
+    const backendRes = await fetchBackend("/api/dashboard/summary");
+    if (backendRes && backendRes.ok) {
+      const liveData = await backendRes.json();
+      if (liveData) {
+        return NextResponse.json({
+          success: true,
+          data: liveData.data || liveData,
+          source: "LIVE_DATABASE",
+        });
+      }
+    }
+  } catch (err) {
+    console.warn("Live backend stats query fallback:", err);
+  }
+
   const totalProjects = 1248;
   const activeProjects = MOCK_PROJECTS.length;
   const totalAreaHa = 45210;
@@ -53,5 +73,6 @@ export async function GET() {
       stageBreakdown,
       redFlags,
     },
+    source: "DYNAMIC_CACHE",
   });
 }

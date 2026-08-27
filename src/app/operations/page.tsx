@@ -33,7 +33,22 @@ export default function OperationsDashboardPage() {
   const [approvedActionMsg, setApprovedActionMsg] = useState<string | null>(null);
 
   useEffect(() => {
-    setProjects(getStoredProjects());
+    async function fetchLiveProjects() {
+      try {
+        const res = await fetch("/api/acquisitions");
+        if (res.ok) {
+          const result = await res.json();
+          if (result && result.data && Array.isArray(result.data)) {
+            setProjects(result.data);
+            return;
+          }
+        }
+      } catch (err) {
+        console.warn("Live projects fetch fallback:", err);
+      }
+      setProjects(getStoredProjects());
+    }
+    fetchLiveProjects();
   }, []);
 
   const pendingApprovals = [

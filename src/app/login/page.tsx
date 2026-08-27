@@ -47,16 +47,13 @@ function LoginForm() {
   const [regPhone, setRegPhone] = useState("");
 
   // Officer Form States
-  const [officerEmail, setOfficerEmail] = useState("cala.dausa@gov.in");
+  const [officerEmail, setOfficerEmail] = useState("");
   const [officerPassword, setOfficerPassword] = useState("");
-  const [officerRoleLabel, setOfficerRoleLabel] = useState("CALA Officer");
   const [dscScanning, setDscScanning] = useState(false);
   const [dscSuccess, setDscSuccess] = useState(false);
 
   // Citizen Form States
-  const [aadhaarOrPhone, setAadhaarOrPhone] = useState("XXXX-XXXX-4291");
-  const [citizenName, setCitizenName] = useState("Rameshwar Prasad Meena");
-  const [citizenKhasra, setCitizenKhasra] = useState("Plot 42A, Ramgarh (Dausa)");
+  const [aadhaarOrPhone, setAadhaarOrPhone] = useState("");
   const [otpStep, setOtpStep] = useState<"INPUT" | "OTP_SENT">("INPUT");
   const [otpValue, setOtpValue] = useState("");
   const [otpSending, setOtpSending] = useState(false);
@@ -74,33 +71,6 @@ function LoginForm() {
       return () => clearTimeout(timer);
     }
   }, [otpCountdown]);
-
-  // Preset Citizen Switcher
-  const setPresetCitizen = (
-    name: string,
-    aadhaar: string,
-    khasra: string
-  ) => {
-    setCitizenName(name);
-    setAadhaarOrPhone(aadhaar);
-    setCitizenKhasra(khasra);
-    setOtpStep("INPUT");
-    setOtpValue("");
-    setErrorMsg(null);
-    setSuccessMsg(null);
-  };
-
-  // Preset Officer Switcher
-  const setPresetOfficer = (
-    presetEmail: string,
-    label: string
-  ) => {
-    setOfficerEmail(presetEmail);
-    setOfficerPassword("");
-    setOfficerRoleLabel(label);
-    setErrorMsg(null);
-    setSuccessMsg(null);
-  };
 
   // 1. Citizen Send OTP
   const handleSendOtp = async (e?: React.FormEvent) => {
@@ -563,98 +533,9 @@ function LoginForm() {
         {/* ===================== CITIZEN LOGIN VIEW ===================== */}
         {authType === "SIGN_IN" && authMode === "CITIZEN" && (
           <div>
-            {/* Quick Citizen Switcher Preset Tabs */}
-            <div className="mb-4">
-              <div className="text-[11px] font-bold text-emphasis uppercase tracking-wider mb-2 flex items-center justify-between">
-                <span>Select Demo Landowner Profile</span>
-                <span className="text-emerald-700 font-mono text-[10px] lowercase">
-                  1-click auto fill
-                </span>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                <button
-                  type="button"
-                  onClick={() =>
-                    setPresetCitizen(
-                      "Rameshwar Prasad Meena",
-                      "XXXX-XXXX-4291",
-                      "Plot 42A, Ramgarh (Dausa)"
-                    )
-                  }
-                  className={`p-2.5 rounded-xl transition-all text-left border ${
-                    citizenName === "Rameshwar Prasad Meena"
-                      ? "bg-emerald-500/15 border-emerald-500/50 text-emerald-900 shadow-sm"
-                      : "bg-surface-container-high/60 border-outline-variant/30 text-emphasis hover:bg-surface-container-high"
-                  }`}
-                >
-                  <div className="font-bold text-xs">Rameshwar Meena</div>
-                  <div className="text-[10px] text-emphasis mt-0.5">Plot 42A • Dausa</div>
-                  <div className="text-[10px] text-emerald-700 font-semibold mt-1">
-                    ₹223.44 L Awarded
-                  </div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    setPresetCitizen(
-                      "Smt. Sunita Devi",
-                      "XXXX-XXXX-8820",
-                      "Khasra 108/2, Ramgarh"
-                    )
-                  }
-                  className={`p-2.5 rounded-xl transition-all text-left border ${
-                    citizenName === "Smt. Sunita Devi"
-                      ? "bg-emerald-500/15 border-emerald-500/50 text-emerald-900 shadow-sm"
-                      : "bg-surface-container-high/60 border-outline-variant/30 text-emphasis hover:bg-surface-container-high"
-                  }`}
-                >
-                  <div className="font-bold text-xs">Smt. Sunita Devi</div>
-                  <div className="text-[10px] text-emphasis mt-0.5">Khasra 108/2 • Bandikui</div>
-                  <div className="text-[10px] text-emerald-700 font-semibold mt-1">
-                    ₹34.80 L Awarded
-                  </div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    setPresetCitizen(
-                      "Vikram Rathore",
-                      "XXXX-XXXX-5512",
-                      "Khasra 89/1, Sawai Madhopur"
-                    )
-                  }
-                  className={`p-2.5 rounded-xl transition-all text-left border ${
-                    citizenName === "Vikram Rathore"
-                      ? "bg-emerald-500/15 border-emerald-500/50 text-emerald-900 shadow-sm"
-                      : "bg-surface-container-high/60 border-outline-variant/30 text-emphasis hover:bg-surface-container-high"
-                  }`}
-                >
-                  <div className="font-bold text-xs">Vikram Rathore</div>
-                  <div className="text-[10px] text-emphasis mt-0.5">Khasra 89/1 • S. Madhopur</div>
-                  <div className="text-[10px] text-emerald-700 font-semibold mt-1">
-                    ₹78.20 L Awarded
-                  </div>
-                </button>
-              </div>
-            </div>
-
-            {/* Glassmorphic Login Box */}
+            {/* Clean Citizen Login Box */}
             <div className="glass-card rounded-2xl p-6 md:p-8 shadow-xl border border-outline-variant/40">
               <form onSubmit={handleCitizenLogin} className="space-y-4">
-                {/* Landowner Name & Assigned Parcel Card */}
-                <div className="p-3 bg-surface-container/60 rounded-xl border border-outline-variant/30 text-xs">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-emphasis font-medium">Target Landowner:</span>
-                    <span className="font-bold text-on-surface">{citizenName}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-emphasis font-medium">Verified Khasra:</span>
-                    <span className="font-mono font-semibold text-primary">{citizenKhasra}</span>
-                  </div>
-                </div>
-
                 {/* Aadhaar or Mobile input */}
                 <div>
                   <label className="block text-xs uppercase text-emphasis mb-1 font-bold">
@@ -695,9 +576,6 @@ function LoginForm() {
                         <label className="text-xs uppercase text-emphasis font-bold">
                           Enter 6-Digit OTP
                         </label>
-                        <span className="text-[11px] text-emerald-800 font-mono font-bold">
-                          Demo OTP: 123456
-                        </span>
                       </div>
                       <div className="relative">
                         <KeyRound className="w-4 h-4 text-emphasis absolute left-3 top-1/2 -translate-y-1/2" />
@@ -708,7 +586,7 @@ function LoginForm() {
                           value={otpValue}
                           onChange={(e) => setOtpValue(e.target.value)}
                           className="solarized-input w-full pl-9 pr-3 py-2.5 rounded-xl text-sm font-mono font-bold tracking-widest text-center"
-                          placeholder="123456"
+                          placeholder="••••••"
                         />
                       </div>
                     </div>
@@ -744,33 +622,6 @@ function LoginForm() {
                   </div>
                 )}
               </form>
-
-              {/* Instant 1-Click Citizen Pass Option */}
-              <div className="mt-4 pt-4 border-t border-outline-variant/30 text-center">
-                <button
-                  type="button"
-                  onClick={async () => {
-                    setLoading(true);
-                    try {
-                      const res = await fetch("/api/auth/citizen-login", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ aadhaarOrPhone: "XXXX-XXXX-4291" }),
-                      });
-                      if (res.ok) {
-                        router.push(redirectTarget || "/citizen-portal");
-                      }
-                    } catch {
-                      setErrorMsg("Instant authentication failed.");
-                      setLoading(false);
-                    }
-                  }}
-                  className="text-xs text-primary font-bold hover:underline inline-flex items-center gap-1.5"
-                >
-                  <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-                  <span>1-Click Instant Citizen Demo Pass (Rameshwar Meena)</span>
-                </button>
-              </div>
             </div>
           </div>
         )}
@@ -778,44 +629,7 @@ function LoginForm() {
         {/* ===================== OFFICER LOGIN VIEW ===================== */}
         {authType === "SIGN_IN" && authMode === "OFFICER" && (
           <div>
-            {/* Quick Officer Switcher Preset Tabs */}
-            <div className="grid grid-cols-3 gap-1 p-1 bg-surface-container-high/70 rounded-xl mb-4 text-xs font-semibold border border-outline-variant/30">
-              <button
-                type="button"
-                onClick={() => setPresetOfficer("cala.dausa@gov.in", "CALA Officer")}
-                className={`py-2 rounded-lg transition-all text-center ${
-                  officerEmail === "cala.dausa@gov.in"
-                    ? "bg-primary text-white shadow-sm font-semibold"
-                    : "text-emphasis hover:text-on-surface"
-                }`}
-              >
-                CALA Officer
-              </button>
-              <button
-                type="button"
-                onClick={() => setPresetOfficer("dg.nhai@gov.in", "Director General")}
-                className={`py-2 rounded-lg transition-all text-center ${
-                  officerEmail === "dg.nhai@gov.in"
-                    ? "bg-primary text-white shadow-sm font-semibold"
-                    : "text-emphasis hover:text-on-surface"
-                }`}
-              >
-                NHAI DG
-              </button>
-              <button
-                type="button"
-                onClick={() => setPresetOfficer("officer@nic.in", "DoLR Lead")}
-                className={`py-2 rounded-lg transition-all text-center ${
-                  officerEmail === "officer@nic.in"
-                    ? "bg-primary text-white shadow-sm font-semibold"
-                    : "text-emphasis hover:text-on-surface"
-                }`}
-              >
-                DoLR Lead
-              </button>
-            </div>
-
-            {/* Glassmorphic Login Box */}
+            {/* Clean Officer Login Box */}
             <div className="glass-card rounded-2xl p-6 md:p-8 shadow-xl border border-outline-variant/40">
               <form onSubmit={handleOfficerLogin} className="space-y-4">
                 {/* Email */}
@@ -864,7 +678,7 @@ function LoginForm() {
                     <span>Verifying HMAC-SHA256 Token...</span>
                   ) : (
                     <>
-                      <span>Sign In as {officerRoleLabel}</span>
+                      <span>Sign In to Officer Portal</span>
                       <ArrowRight className="w-4 h-4" />
                     </>
                   )}
